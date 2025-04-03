@@ -1,63 +1,63 @@
 
 import React, { useState, useEffect } from "react";
-import TaskForm from "../components/TaskForm";
-import TaskList from "../components/TaskList";
-import { Task, Priority } from "../types/task";
-import {
-  getTasks,
-  addTask,
-  deleteTask,
-  toggleTaskCompletion,
-  updateTask,
-  filterTasks,
-  sortTasks,
-} from "../utils/taskUtils";
-import { toast } from "../components/ui/use-toast";
+import TaskForm from "@/components/TaskForm";
+import TaskList from "@/components/TaskList";
+import { Task, Priority } from "@/types/task";
+import { addTask, getTasks, deleteTask, toggleTaskCompletion, updateTask, filterTasks, sortTasks } from "@/utils/taskUtils";
+import { useToast } from "@/hooks/use-toast";
+import Navigation from "@/components/Navigation";
 
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [showCompleted, setShowCompleted] = useState(true);
   const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
-  const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const { toast } = useToast();
 
-  // Load tasks from localStorage on component mount
+  // Load tasks on mount
   useEffect(() => {
     setTasks(getTasks());
   }, []);
 
-  // Apply filters and sorting when tasks or filters change
-  useEffect(() => {
-    const filtered = filterTasks(tasks, showCompleted, priorityFilter);
-    const sorted = sortTasks(filtered);
-    setFilteredTasks(sorted);
-  }, [tasks, showCompleted, priorityFilter]);
+  // Filter and sort tasks
+  const filteredTasks = sortTasks(
+    filterTasks(tasks, showCompleted, priorityFilter)
+  );
 
-  const handleAddTask = (
-    title: string,
-    description: string,
-    priority: Priority,
-    dueDate: string | null
-  ) => {
+  const handleAddTask = (title: string, description: string, priority: Priority, dueDate: string | null) => {
     const newTask = addTask(title, description, priority, dueDate);
-    setTasks((prevTasks) => [...prevTasks, newTask]);
-    setShowTaskForm(false);
+    setTasks([...tasks, newTask]);
+    setIsFormVisible(false);
     toast({
       title: "Task added",
-      description: "Your new task has been created successfully.",
+      description: "Your new task has been created",
     });
   };
 
-  const handleUpdateTask = (
-    title: string,
-    description: string,
-    priority: Priority,
-    dueDate: string | null
-  ) => {
+  const handleDeleteTask = (id: string) => {
+    deleteTask(id);
+    setTasks(tasks.filter((task) => task.id !== id));
+    toast({
+      title: "Task deleted",
+      description: "The task has been removed",
+    });
+  };
+
+  const handleToggleComplete = (id: string) => {
+    const updatedTasks = toggleTaskCompletion(id);
+    setTasks(updatedTasks);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsFormVisible(true);
+  };
+
+  const handleUpdateTask = (title: string, description: string, priority: Priority, dueDate: string | null) => {
     if (!editingTask) return;
 
-    const updatedTask: Task = {
+    const updatedTask = {
       ...editingTask,
       title,
       description,
@@ -68,70 +68,35 @@ const Index = () => {
     const updatedTasks = updateTask(updatedTask);
     setTasks(updatedTasks);
     setEditingTask(null);
+    setIsFormVisible(false);
     toast({
       title: "Task updated",
-      description: "Your task has been updated successfully.",
+      description: "The task has been updated successfully",
     });
-  };
-
-  const handleToggleComplete = (id: string) => {
-    const updatedTasks = toggleTaskCompletion(id);
-    setTasks(updatedTasks);
-  };
-
-  const handleDeleteTask = (id: string) => {
-    deleteTask(id);
-    setTasks((prevTasks) => prevTasks.filter((task) => task.id !== id));
-    toast({
-      variant: "destructive",
-      title: "Task deleted",
-      description: "Your task has been deleted.",
-    });
-  };
-
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
   };
 
   const handleCancelEdit = () => {
     setEditingTask(null);
-    setShowTaskForm(false);
+    setIsFormVisible(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Task Manager</h1>
-          <p className="text-gray-600">Stay organized and get things done</p>
+      <Navigation />
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Task Manager</h1>
+          {!isFormVisible && (
+            <button
+              onClick={() => setIsFormVisible(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Add New Task
+            </button>
+          )}
         </div>
 
-        {/* Task Form Toggle Button */}
-        {!editingTask && !showTaskForm && (
-          <button
-            onClick={() => setShowTaskForm(true)}
-            className="w-full md:w-auto flex items-center justify-center space-x-2 mb-6 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Add New Task</span>
-          </button>
-        )}
-
-        {/* Task Form (Add/Edit) */}
-        {(showTaskForm || editingTask) && (
+        {isFormVisible && (
           <TaskForm
             onSubmit={editingTask ? handleUpdateTask : handleAddTask}
             onCancel={handleCancelEdit}
@@ -140,7 +105,6 @@ const Index = () => {
           />
         )}
 
-        {/* Task List */}
         <TaskList
           tasks={filteredTasks}
           onToggleComplete={handleToggleComplete}
